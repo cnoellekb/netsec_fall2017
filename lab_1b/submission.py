@@ -58,7 +58,7 @@ def basicUnitTest():
 
 	packet3 = Authentication()
 	packet3.qidentity = 10
-	packet3.hashvalue = b"answer"
+	packet3.hashvalue = b"18C907ADF5843DE4EA9F0E6B48539D5A0F960DE280A064C114C8C7D4A1F4CE2997E8645DFBAB43BA71A8B77E4C40836F1CC3E4A99C562716E76D5570D0A74E58"
 	packet3Bytes = packet3.__serialize__()
 	packet3a=Authentication.Deserialize(packet3Bytes)
 	assert packet3 == packet3a
