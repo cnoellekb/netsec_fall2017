@@ -67,7 +67,7 @@ def basicUnitTest():
 	#packet7.qidentity = -10
 	#packet7.hashvalue = b"18C907ADF5843DE4EA9F0E6B48539D5A0F960DE280A064C114C8C7D4A1F4CE2997E8645DFBAB43BA71A8B77E4C40836F1CC3E4A99C562716E76D5570D0A74E58"
 	#packet7Bytes = packet7.__serialize__()
-	#packet7a=Challenge.Deserialize(packet7Bytes)
+	#packet7a=Authentication.Deserialize(packet7Bytes)
 	#assert packet7 == packet7a
 	
 	packet4 = Connection()
@@ -84,11 +84,11 @@ def basicUnitTest():
 	packet6a=Connection.Deserialize(packet6Bytes)
 	assert packet6 == packet6a
 	
-	#packet5 = Confirmation()
+	#packet5 = Connection()
 	#packet5.identity = -10
 	#packet5.confirmation = true
 	#packet5Bytes = packet5.__serialize__()
-	#packet5a=Confirmation.Deserialize(packet5Bytes)
+	#packet5a=Connection.Deserialize(packet5Bytes)
 	#assert packet5 == packet5a
 
 if __name__=="__main__":
