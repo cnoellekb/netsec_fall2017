@@ -90,6 +90,7 @@ class MyClientProtocol(asyncio.Protocol):
 		print("Connected to {}".format(transport.get_extra_info("peername")))
 		self.transport = transport
 		self.deserializer = PacketType.Deserializer()
+		self.transport.write(hiyo())
 
 	def data_received(self, data):
 		print("At the Client")
@@ -106,8 +107,14 @@ class MyClientProtocol(asyncio.Protocol):
 	def connection_lost(self, exc):
 		self.transport = None
 
+
+class EchoControl:
+	def buildProtocol(self):
+		return MyClientProtocol()
+
 loop = asyncio.get_event_loop()
-coro = playground.getConnector().create_playground_connection(lambda:MyClientProtocol(), "2020.20.2.2", 27122)
+conn = EchoControl()
+coro = playground.getConnector().create_playground_connection(conn.buildProtocol, "2020.20.2.2", 101)
 #coro = loop.create_connection(lambda:MyClientProtocol(), "127.0.0.1", 27122)
 client = loop.run_until_complete(coro)
 print("Echo Client Connected.")
