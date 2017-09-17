@@ -114,7 +114,7 @@ class MyServerProtocol(asyncio.Protocol):
 		print("Connection end")
 
 loop = asyncio.get_event_loop()
-coro = playground.getConnector().create_playground_server(lambda: MyServerProtocol(), 27122)
+coro = playground.getConnector().create_playground_server(lambda: MyServerProtocol(), 101)
 server = loop.run_until_complete(coro)
 print("Echo Server Started ")
 loop.run_forever()
