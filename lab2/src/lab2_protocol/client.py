@@ -23,39 +23,20 @@ class PEEPPacket(PacketType):
 def calculateChecksum(pc):
 	return zlib.adler32(pc) & 0xffff
 
-class MyClientProtocol(asyncio.Protocol):
-	def __init__(self):
-		self.transport = None
-	def connection_made(self, transport):
-		print("Handshake Successful: Connected to {}".format(transport.get_extra_info("peername")))
+
+
+class PeepClientTransport(StackingTransport):
+
+	def __init__(self,protocol,transport):
+		self.protocol = protocol
 		self.transport = transport
-		self.deserializer = PacketType.Deserializer()
-
-	def data_received(self, data):
-		print("At the Client")
-
-	def connection_lost(self, exc):
-		self.transport = None
 
 
-class EchoControl:
-	def buildProtocol(self):
-		return MyClientProtocol()
+	def write(self, data):
+		self.protocol.write(data)
 
-class passthrough1(StackingProtocol):
-
-	def __init__(self):
-		self.transport = None
-		super().__init__
-
-	def connection_made(self,transport):
-		print("Passthrough Layer 1-Connection Made Called")
-		self.transport = transport
-		self.higherProtocol().connection_made(self.transport)
-
-	def data_received(self,data):
-		print("Passthrough Layer 1-Connection Made Called")
-		self.higherProtocol().data_received(data)
+	def close(self):
+		self.lowerTransport().connection_lost()
 
   
 class PEEPClientProtocol(StackingProtocol):
@@ -99,7 +80,8 @@ class PEEPClientProtocol(StackingProtocol):
 					self.transport.write(pack)
 					print("Type= {}    Acknowledgment = {}    SequenceNumber = {}   Initial Checksum = {}".format(packet.Type, packet.Acknowledgement, packet.SequenceNumber, packet.Checksum))
 					print("ACK Packet Sent")
-					self.higherProtocol().connection_made(self.transport)
+					peeptransport = PeepClientTransport(self, self.transport)
+					self.higherProtocol().connection_made(peeptransport)
 				else:
 					connection_lost(self)
 			else:
@@ -109,13 +91,4 @@ class PEEPClientProtocol(StackingProtocol):
 		self.transport = None
 
 
-#f = StackingProtocolFactory(lambda: passthrough1(), lambda: passthrough2())
-#ptConnector = playground.Connector(protocolStack=f)
-#playground.setConnector("passthrough", ptConnector)
-#loop = asyncio.get_event_loop()
-#conn = EchoControl()
-#coro = playground.getConnector("passthrough").create_playground_connection(conn.buildProtocol, "2020.20.2.2", 101)
-#client = loop.run_until_complete(coro)
-#loop.run_forever()
-#loop.close()
 Clientfactory = StackingProtocolFactory(lambda: PEEPClientProtocol()) 
