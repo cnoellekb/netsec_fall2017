@@ -24,41 +24,6 @@ class PEEPPacket(PacketType):
 def calculateChecksum(pc):
 	return zlib.adler32(pc) & 0xffff
 
-class MyServerProtocol(asyncio.Protocol):
-	def __init__(self):
-		self.transport = None
-        
-	def connection_made(self, transport):
-		print("Received a connection from {}".format(transport.get_extra_info("peername")))
-		self.transport = transport
-		self.deserializer = PacketType.Deserializer()
-	def data_received(self, data):
-		self.deserializer.update(data)
-		for pkt in self.deserializer.nextPackets():
-			if pkt.Type == 2:
-				print("Hello Packet received")
-			else:
-				connection_lost(self)
-	def connection_lost(self, reason=None):
-		print("Connection end")
-
-
-class passthrough1(StackingProtocol):
-
-	def __init__(self):
-		self.transport = None
-		super().__init__
-
-	def connection_made(self,transport):
-		print("Passthrough Layer 1-Connection Made Called")
-		self.transport = transport
-		self.higherProtocol().connection_made(self.transport)
-
-	def data_received(self,data):
-		print("Passthrough Layer 1-Data Received Called")
-		self.higherProtocol().data_received(data)
-				
-        
 class PeepServerTransport(StackingTransport):
 
 	def __init__(self,protocol, transport):
@@ -115,8 +80,9 @@ class PEEPServerProtocol(StackingProtocol):
 				verify = zlib.adler32(bytes) & 0xffff
 				if verify == oldChecksum:
 					print("ACK Packet Verified")
-					peeptransport = PeepClientTransport(self, self.transport)
-					self.higherProtocol().connection_made(peeptransport)
+					peeptransport = PeepServerTransport(self, self.transport)
+					higherTransport = StackingTransport(peeptransport)
+					self.higherProtocol().connection_made(higherTransport)
 				else:
 					connection_lost(self)
 			else:
@@ -126,14 +92,4 @@ class PEEPServerProtocol(StackingProtocol):
 	def connection_lost(self, reason=None):
 		print("Connection end")
 		
-
-#f = StackingProtocolFactory(lambda: passthrough1(), lambda: passthrough2())
-#ptConnector = playground.Connector(protocolStack=f)
-#playground.setConnector("passthrough", ptConnector)
-#loop = asyncio.get_event_loop()
-#coro = playground.getConnector("passthrough").create_playground_server(lambda: MyServerProtocol(), 101)
-#server = loop.run_until_complete(coro)
-#print("Echo Server Started ")
-#loop.run_forever()
-#loop.close()
 Serverfactory = StackingProtocolFactory(lambda: PEEPServerProtocol())
