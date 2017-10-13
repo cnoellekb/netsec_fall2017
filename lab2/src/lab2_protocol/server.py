@@ -32,6 +32,7 @@ class PeepServerTransport(StackingTransport):
 		super().__init__(self.transport)
 
 	def write(self, data):
+		print("entering peep client")
 		self.protocol.process_upper_layer_data(data)
 
 	def close(self):
@@ -42,10 +43,10 @@ class PEEPServerProtocol(StackingProtocol):
 	def __init__(self):
 		self.transport = None
 		self.recievedBytes = [] # in order data collected from client
-		self.expectedAck = 0
-		self.expectedAcks = {}
+		self.synAckSeq = 0
 		self.dataSeqStart = 0
 		self.packets = [] # packets with chunks of data sent from higher layer to be sent to client
+		self.mostRecentACK = None
 
 	def connection_made(self, transport):
 		print("Received a Handshake Request from {}".format(transport.get_extra_info("peername")))
@@ -59,8 +60,6 @@ class PEEPServerProtocol(StackingProtocol):
 		while len(data) > 0:
 			chunks.append(data[:1024])
 			data = data[1024:]
-
-		for (i, chunk) in enumerate(chunks):
 			newPkt = PEEPPacket()
 			newPkt.Data = chunk
 			newPkt.Type = 5
@@ -71,17 +70,9 @@ class PEEPServerProtocol(StackingProtocol):
 			packet4Bytes = newPkt.__serialize__()
 			newPkt.Checksum = calculateChecksum(packet4Bytes)
 			self.packets.append(newPkt)
-			self.expectedAcks[seq - 1] = i
-			# if we try to send this packet 5 times and it still doesn't work then close the connection
-			# for j in range(5):
-			# 	oldExpectedAck = self.expectedAck
-			# 	self.transport().write(newPkt.__serialize__())
-			# 	await asyncio.sleep(1)
-			# 	if self.expectedAck > oldExpectedAck:
-			# 		break
-			# 	elif j == 4:
-			# 		self.connection_lost(self)
 			self.transport.write(newPkt.__serialize__())
+
+			# TODO need to wait for ack and resend if it takes too long
 
 	def data_received(self, data):
 		self.deserializer.update(data)
@@ -98,9 +89,8 @@ class PEEPServerProtocol(StackingProtocol):
 					print("SYN Packet Verified")
 					pack = PEEPPacket()
 					pack.Type = 1
-					pack.Acknowledgement = pkt.SequenceNumber + 1
-					self.dataSeqStart = random.randrange(10)
-					pack.SequenceNumber = self.dataSeqStart
+					pack.Acknowledgement = pkt.SequenceNumber
+					self.synAckSeq = pkt.SequenceNumber
 					pack.Checksum = 0
 					packet4Bytes = pack.__serialize__()
 					pack.Checksum = calculateChecksum(packet4Bytes)
@@ -122,13 +112,12 @@ class PEEPServerProtocol(StackingProtocol):
 				if verify == oldChecksum:
 					print("ACK Packet Verified")
 					peeptransport = PeepServerTransport(self, self.transport)
-					higherTransport = StackingTransport(peeptransport)
-					self.higherProtocol().connection_made(higherTransport)
+					self.higherProtocol().connection_made(peeptransport)
+					self.mostRecentACK = pkt
 
 					# if the correct ack is sent back then increment the expected ack for the next packet
-					if self.expectedAck == pkt.Acknowledgement:
-						nextPkt = self.packets[self.expectedAcks[self.expectedAck] + 1]
-						self.expectedAck += len(nextPkt) + 1
+					if self.packets[0].SequenceNumber + len(self.packets[0].Data) == pkt.Acknowledgement:
+						self.packets.pop(0)
 
 			elif pkt.Type == 5:
 				print("Data Packet Received")
@@ -141,23 +130,16 @@ class PEEPServerProtocol(StackingProtocol):
 				if verify == oldChecksum:
 					print("Data Verified")
 					# if this is the expected data packet return an ack
-					if pkt.SequenceNumber - len(pkt.Data) == self.dataSeqStart+1 or pkt.SequenceNumber - len(pkt.Data) == self.recievedBytes[-1].SequenceNumber + 1:
-						self.recievedBytes.append(pkt.Data)
+					if pkt.SequenceNumber == self.synAckSeq + 1 or pkt.SequenceNumber - len(pkt.Data) == self.receivedBytes[-1].SequenceNumber + 1:
+						self.recievedBytes.append(pkt)
 						ack = PEEPPacket()
 						ack.Type = 2
 						ack.Acknowledgement = pkt.SequenceNumber + len(pkt.Data)
 						ack.Checksum = 0
+						packet4Bytes = ack.__serialize__()
+						ack.Checksum = calculateChecksum(packet4Bytes)
 						self.transport.write(ack.__serialize__())
-						self.higherProtocol().data_received(pkt.__serialize__())
-						self.recievedBytes = []
-
-						# if the incoming data is piggybacked
-						if pkt.Acknowledgement != "Unset Packet Field":
-							# if the correct ack is sent back then increment the expected ack for the next packet
-							if self.expectedAck == pkt.Acknowledgement:
-								nextPkt = self.packets[self.expectedAcks[self.expectedAck] + 1]
-								self.expectedAck += len(nextPkt) + 1
-
+						self.higherProtocol().data_received(pkt.Data)
 
 				else:
 					connection_lost(self)
