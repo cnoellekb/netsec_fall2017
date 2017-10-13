@@ -42,7 +42,7 @@ class PEEPServerProtocol(StackingProtocol):
 
 	def __init__(self):
 		self.transport = None
-		self.recievedBytes = [] # in order data collected from client
+		self.receivedBytes = [] # in order data collected from client
 		self.synAckSeq = 0
 		self.dataSeqStart = 0
 		self.packets = [] # packets with chunks of data sent from higher layer to be sent to client
@@ -131,7 +131,7 @@ class PEEPServerProtocol(StackingProtocol):
 					print("Data Verified")
 					# if this is the expected data packet return an ack
 					if pkt.SequenceNumber == self.synAckSeq + 1 or pkt.SequenceNumber - len(pkt.Data) == self.receivedBytes[-1].SequenceNumber + 1:
-						self.recievedBytes.append(pkt)
+						self.receivedBytes.append(pkt)
 						ack = PEEPPacket()
 						ack.Type = 2
 						ack.Acknowledgement = pkt.SequenceNumber + len(pkt.Data)
